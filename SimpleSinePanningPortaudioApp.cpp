@@ -1,5 +1,8 @@
 /*
- *  patest_sine_PanLR3.cpp
+ *  SimpleSinePanningPortaudioApp.cpp
+ *
+ *  to compile, use 
+ *  g++  -L/opt/local/lib/  -lportaudio -o SimpleSinePanningPortaudioApp.o SimpleSinePanningPortaudioApp.cpp
  *
  *  Created by Yuan-Yi Fan on 1/12/11.
  *
