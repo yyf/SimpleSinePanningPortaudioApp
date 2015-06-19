@@ -1,11 +1,18 @@
+/*
+ *  SimpleSinePanningPortaudioApp.cpp
+ *
+ *  Created by Yuan-Yi Fan on 1/13/11.
+ *
+ */
 
 #include <stdio.h>
 #include <math.h>
 #include "portaudio.h"
+#include <iostream>
 
 #define NUM_SECONDS   (5)
 #define SAMPLE_RATE   (44100)
-#define FRAMES_PER_BUFFER  (256) 
+#define FRAMES_PER_BUFFER  (64) 
 
 #define NUM_CH (2)
 
@@ -13,9 +20,12 @@
 #define M_PI  (3.14159265)
 #endif
 
-#define TABLE_SIZE   (44100)
-#define MOD_TABLE_SIZE (44100)
+float panValue=0.0;
+float panDeg=180.0;
 
+using namespace std;
+
+#define TABLE_SIZE   (200)
 typedef struct
 {
     float sine[TABLE_SIZE];
@@ -23,13 +33,25 @@ typedef struct
     int right_phase;
     char message[20];
 	
-	int mod_phase;
-	float modFreq;
-	float modIndex;
-	float amp;
-	float freq;
+	float ampL;
+	float ampR;
 }
 paTestData;
+
+
+float setPan(float x){
+	float y;
+	y = cos (((x*30+60)*M_PI)/180);
+	return y;
+}
+
+//float setPanDeg(float xd){
+//	float yd;
+//	// xd 0~180
+//	// input range of setPan -1~1
+//	yd = setPan(cos(xd*M_PI/180));
+//	return yd;
+//}
 
 static int patestCallback( const void *inputBuffer, void *outputBuffer,
 						  unsigned long framesPerBuffer,
@@ -37,36 +59,27 @@ static int patestCallback( const void *inputBuffer, void *outputBuffer,
 						  PaStreamCallbackFlags statusFlags,
 						  void *userData ) 
 {
-	
-	paTestData *data = (paTestData*)userData;
+    paTestData *data = (paTestData*)userData; 
     float *out = (float*)outputBuffer;
-    unsigned long i;
-	float mod;
+    unsigned long i; //
+	
     (void) timeInfo; /* Prevent unused variable warnings. */
-    (void) statusFlags;
-    (void) inputBuffer;	
+    (void) statusFlags; // don't get un use warning from compiler
+    (void) inputBuffer;
 	
     for( i=0; i<framesPerBuffer; i++ )
     {
-		// FreqMod		
-		mod = (float) sin( ((double)data->mod_phase/(double)TABLE_SIZE) * M_PI * 2. ); 
-		mod *= data->modIndex * data->modFreq; 
-		
-		*out++ = data->amp * (float) sin( ((double)data->left_phase/(double)TABLE_SIZE) * M_PI * 2. );
-		*out++ = data->amp * (float) sin( ((double)data->right_phase/(double)TABLE_SIZE) * M_PI * 2. );
-		
-        data->left_phase += (int) ((data->freq + mod) *TABLE_SIZE/SAMPLE_RATE);
+//		*out++ = (data->ampL)*setPan(panValue)*data->sine[data->left_phase];  /* left */ // ++= move to next memory location
+//        *out++ = (data->ampR)*(1-setPan(panValue))*data->sine[data->right_phase];  /* right */
+		*out++ = (data->ampL)*setPan(panDeg)*data->sine[data->left_phase];  /* left */ // ++= move to next memory location
+        *out++ = (data->ampR)*(1-setPan(panDeg))*data->sine[data->right_phase];  /* right */
+        data->left_phase += 1;
         if( data->left_phase >= TABLE_SIZE ) data->left_phase -= TABLE_SIZE;
-        data->right_phase += (int) ((data->freq + mod)*TABLE_SIZE/SAMPLE_RATE);
+        data->right_phase += 3; /* higher pitch so we can distinguish left and right. */
         if( data->right_phase >= TABLE_SIZE ) data->right_phase -= TABLE_SIZE;
-		
-		data->mod_phase += (int) (data->modFreq*MOD_TABLE_SIZE/SAMPLE_RATE);
-        if( data->mod_phase >= MOD_TABLE_SIZE ) data->mod_phase -= MOD_TABLE_SIZE;
-		
     }
 	
     return paContinue;
-	
 }
 
 static void StreamFinished( void* userData )
@@ -75,31 +88,29 @@ static void StreamFinished( void* userData )
 	printf( "Stream Completed: %s\n", data->message );
 }
 
-//int main(void);
+int main(void);
 int main(void)
 {
     PaStreamParameters outputParameters;
     PaStream *stream; //audio stream
     PaError err; //error code
     paTestData data; // holds the paTestData structure whose sine table we are initializing
-    int i;	
+    int i;
 	
     printf("PortAudio Test: output sine wave. SR = %d, BufSize = %d\n", SAMPLE_RATE, FRAMES_PER_BUFFER);
     
     /* initialise sinusoidal wavetable */
     for( i=0; i<TABLE_SIZE; i++ )
     {
-        data.sine[i] = (float) sin( ((double)i/(double)TABLE_SIZE) * M_PI * 2. );// cast to double for precision		
+        data.sine[i] = (float) sin( ((double)i/(double)TABLE_SIZE) * M_PI * 2. ); // cast to double for precision
     }
 	
-	data.amp = 1; 
-	data.freq = 640;
-	data.mod_phase = 0;
-	
-	data.modFreq=1;
-	data.modIndex=5;
-	
     data.left_phase = data.right_phase = 0;//initialize phase to zero
+	data.ampL = 0.9;
+	data.ampR = 0.0;
+	
+//	printf("value for L ch = %f\n", setPan(data.ampL));
+//	printf("value for R ch = %f\n", (1-setPan(panDeg)));	
 	
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
@@ -148,3 +159,7 @@ error: //label
     fprintf( stderr, "Error message: %s\n", Pa_GetErrorText( err ) );
     return err;
 }
+
+
+
+
