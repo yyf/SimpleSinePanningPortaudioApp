@@ -1,7 +1,7 @@
 /*
- *  SimpleSinePanningPortaudioApp.cpp
+ *  patest_sine_PanLR3.cpp
  *
- *  Created by Yuan-Yi Fan on 1/13/11.
+ *  Created by Yuan-Yi Fan on 1/12/11.
  *
  */
 
@@ -20,8 +20,7 @@
 #define M_PI  (3.14159265)
 #endif
 
-float panValue=0.0;
-float panDeg=180.0;
+int panValue;
 
 using namespace std;
 
@@ -38,21 +37,6 @@ typedef struct
 }
 paTestData;
 
-
-float setPan(float x){
-	float y;
-	y = cos (((x*30+60)*M_PI)/180);
-	return y;
-}
-
-//float setPanDeg(float xd){
-//	float yd;
-//	// xd 0~180
-//	// input range of setPan -1~1
-//	yd = setPan(cos(xd*M_PI/180));
-//	return yd;
-//}
-
 static int patestCallback( const void *inputBuffer, void *outputBuffer,
 						  unsigned long framesPerBuffer,
 						  const PaStreamCallbackTimeInfo* timeInfo,
@@ -66,16 +50,35 @@ static int patestCallback( const void *inputBuffer, void *outputBuffer,
     (void) timeInfo; /* Prevent unused variable warnings. */
     (void) statusFlags; // don't get un use warning from compiler
     (void) inputBuffer;
-	
+    
     for( i=0; i<framesPerBuffer; i++ )
     {
-//		*out++ = (data->ampL)*setPan(panValue)*data->sine[data->left_phase];  /* left */ // ++= move to next memory location
-//        *out++ = (data->ampR)*(1-setPan(panValue))*data->sine[data->right_phase];  /* right */
-		*out++ = (data->ampL)*setPan(panDeg)*data->sine[data->left_phase];  /* left */ // ++= move to next memory location
-        *out++ = (data->ampR)*(1-setPan(panDeg))*data->sine[data->right_phase];  /* right */
-        data->left_phase += 1;
+		switch(panValue){
+			case -1: //left ch full volume
+				data->ampL=1;
+				data->ampR=0;
+				*out++ = data->ampL * data->sine[data->left_phase];  /* left */ 
+				*out++ = data->ampR * data->sine[data->right_phase];  /* right */ 
+				break;
+			case 0: //centered
+				data->ampL=0.5;
+				data->ampR=0.5;
+				*out++ = data->ampL * data->sine[data->left_phase];  /* left */ 
+				*out++ = data->ampR * data->sine[data->right_phase];  /* right */
+				break;
+			case 1: //right ch full volume
+				data->ampL=0;
+				data->ampR=1;
+				*out++ = data->ampL * data->sine[data->left_phase];  /* left */ 
+				*out++ = data->ampR * data->sine[data->right_phase];  /* right */
+				break;	
+		}
+		
+//        *out++ = data->amp * data->sine[data->left_phase];  /* left */ 
+//        *out++ = data->amp * data->sine[data->right_phase];  /* right */
+        data->left_phase += 3;
         if( data->left_phase >= TABLE_SIZE ) data->left_phase -= TABLE_SIZE;
-        data->right_phase += 3; /* higher pitch so we can distinguish left and right. */
+        data->right_phase += 5; /* higher pitch so we can distinguish left and right. */
         if( data->right_phase >= TABLE_SIZE ) data->right_phase -= TABLE_SIZE;
     }
 	
@@ -91,6 +94,16 @@ static void StreamFinished( void* userData )
 int main(void);
 int main(void)
 {
+    cout<< "input -1 for left ch full volume, 0 for centered, and 1 for right ch full volume!" << endl;
+	cin >> panValue;
+	if (panValue > 1) {
+		cout << "value out of range";
+		goto error;
+	}
+	if (panValue < -1) {
+		cout << "value out of range";
+		goto error;	
+	}
     PaStreamParameters outputParameters;
     PaStream *stream; //audio stream
     PaError err; //error code
@@ -106,11 +119,8 @@ int main(void)
     }
 	
     data.left_phase = data.right_phase = 0;//initialize phase to zero
-	data.ampL = 0.9;
-	data.ampR = 0.0;
-	
-//	printf("value for L ch = %f\n", setPan(data.ampL));
-//	printf("value for R ch = %f\n", (1-setPan(panDeg)));	
+	data.ampL = 0.5;
+	data.ampR = 0.5;	
 	
     err = Pa_Initialize();
     if( err != paNoError ) goto error;
@@ -159,7 +169,5 @@ error: //label
     fprintf( stderr, "Error message: %s\n", Pa_GetErrorText( err ) );
     return err;
 }
-
-
 
 
